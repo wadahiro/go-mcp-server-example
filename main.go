@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net/http"
 
@@ -21,6 +22,23 @@ func Echo(ctx context.Context, req *mcp.CallToolRequest, args *EchoArgs) (*mcp.C
 }
 
 func main() {
+	// Parse command line flags
+	authzServerURL := flag.String("authz-server-url", "http://localhost/realms/demo", "Authorization Server URL")
+	jwksURL := flag.String("jwks-url", "http://localhost/realms/demo/protocol/openid-connect/certs", "JWKS URL")
+	resourceURL := flag.String("resource-url", "http://localhost:8000", "Resource URL for this server")
+	flag.Parse()
+
+	// Initialize OAuth config
+	oauthConfig := &OAuthConfig{
+		AuthzServerURL: *authzServerURL,
+		JwksURL:        *jwksURL,
+		ResourceURL:    *resourceURL,
+	}
+
+	if err := oauthConfig.InitJWKS(); err != nil {
+		log.Fatalf("Failed to initialize JWKS: %v", err)
+	}
+
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "simple-mcp-server",
 		Version: "1.0.0",
@@ -41,14 +59,29 @@ func main() {
 		},
 	}, Echo)
 
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+	// MCP handler
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
 	}, nil)
 
-	log.Println("Starting MCP server on :8000")
-	log.Println("Tool available: echo")
+	// Setup routing
+	mux := http.NewServeMux()
 
-	if err := http.ListenAndServe(":8000", handler); err != nil {
+	// OAuth 2.1 metadata endpoint (no authorization required)
+	mux.HandleFunc("/.well-known/oauth-protected-resource", oauthConfig.HandleProtectedResourceMetadata)
+
+	// MCP endpoint (OAuth authorization required, with logging)
+	mux.Handle("/", LoggingMiddleware(oauthConfig.OAuthMiddleware(mcpHandler)))
+
+	log.Println("Starting MCP server on :8000")
+	log.Printf("Authorization Server URL: %s", *authzServerURL)
+	log.Printf("JWKS URL: %s", *jwksURL)
+	log.Printf("Resource URL: %s", *resourceURL)
+	log.Println("Tool available: echo")
+	log.Println("OAuth2.1 endpoint:")
+	log.Println("  - /.well-known/oauth-protected-resource")
+
+	if err := http.ListenAndServe(":8000", mux); err != nil {
 		log.Printf("Server failed: %v", err)
 	}
 }
