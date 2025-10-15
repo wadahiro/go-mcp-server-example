@@ -16,13 +16,13 @@ This project demonstrates how to implement an MCP server with OAuth protection u
 
 ```
                     OAuth 2.1 Flow (DCR, Authorization Code)
-    ┌─────────────────────────────────────────────────────────┐
+    ┌───────────────────────────────────────────────────────────┐
     │                                                           │
     │                                                           ▼
-┌───┴─────────┐   HTTP + Bearer Token   ┌─────────────┐   ┌──────────────┐
-│ MCP Client  │────────────────────────►│ MCP Server  │   │  Keycloak    │
+┌───┴─────────┐   HTTP + Bearer Token   ┌─────────────┐   ┌───────────────┐
+│ MCP Client  │────────────────────────►│ MCP Server  │   │  Keycloak     │
 │ (Inspector) │                         │ (This repo) │   │ (AuthZ Server)│
-└─────────────┘                         └─────────────┘   └──────────────┘
+└─────────────┘                         └─────────────┘   └───────────────┘
                                               │                   │
                                               │◄──────────────────┘
                                               │   JWKS (RS256 Public Key)
